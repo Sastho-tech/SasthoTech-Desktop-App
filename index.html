@@ -189,8 +189,9 @@
 
     <script>
         const { ipcRenderer } = require('electron');
-        const {  api } = require('./api');
+        const {  api,login } = require('./api');
         const axios = require('axios');
+        require('dotenv').config();
     async function updateProcessList(processes) {
         const processListElement = document.getElementById('processList');
         processListElement.innerHTML = '';
@@ -221,12 +222,21 @@
     async function checkVersionAndUpdate(id) {
         try {
            
-            const loginData = await getLoginData();
+            let loginData = await getLoginData();
 
             console.log(loginData,'login Data')
+            if(!loginData){
+            const loginResult=    await login(process.env.ADMIN_EMAIL, process.env.ADMIN_PASSWORD);
+    if (loginResult.message === 'Login successfully') {
+      console.log('Auto-login successful');
+      loginData = loginResult.data;
+      // setTimeout(()=>{},2000)
+    }
+            }
+            
             console.log(`Fetching current version and checking for updates for ${id}`);
-            const versionResponse = await api.get(`http://localhost:5001/api/v1/update/get-version/${id}`);
-            const currentVersion = versionResponse.data.version;
+            const versionResponse = await api.get(`http://localhost:5001/api/v1/update/get-version/${id}?diagnosticId=${loginData?.diagnosticId}`);
+            const currentVersion = versionResponse?.data?.version??"0.0.0";
             document.getElementById(`${id}-version`).textContent = currentVersion;
 
             const updateResponse = await api.get(`http://localhost:5001/api/v1/update/check-update/${id}/${currentVersion}`);
@@ -342,21 +352,7 @@
         document.getElementById('restartAllBtn').addEventListener('click', () => {
             ipcRenderer.send('start-all-server');
         });
-        async function login(email, password) {
-     try {
-    const result = await window.ipcRenderer.invoke('login', { email, password });
-    if (result.success) {
-      console.log('Login successful:', result.data);
-      // Update UI or perform actions after successful login
-    } else {
-      console.error('Login failed:', result.error);
-      // Handle login failure (show error message, etc.)
-    }
-  } catch (error) {
-    console.error('Login error:', error);
-    // Handle any unexpected errors
-  }
-}
+       
         document.getElementById('stopAllBtn').addEventListener('click', () => {
             ipcRenderer.send('stop-all-servers');
         });
