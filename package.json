@@ -1,0 +1,19 @@
+{
+  "name": "electron-multi-server-app",
+  "version": "1.0.0",
+  "description": "Electron app running three Node.js servers",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.15",
+    "axios": "^1.7.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.17.1",
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "electron": "^32.0.1"
+  }
+}

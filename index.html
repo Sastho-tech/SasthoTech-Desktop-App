@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SasthoTech Hospital Management System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f4f8;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 1000px;
+            width: 100%;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            font-size: 2rem;
+        }
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 0.7rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            text-transform: uppercase;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        #updateBtn, .update-btn {
+            background-color: #3498db;
+            color: white;
+        }
+        #updateBtn:hover, .update-btn:hover {
+            background-color: #2980b9;
+        }
+        #restartBtn, .start-btn {
+            background-color: #2ecc71;
+            color: white;
+        }
+        #restartBtn:hover, .start-btn:hover {
+            background-color: #27ae60;
+        }
+        #stopBtn, .stop-btn {
+            background-color: #e74c3c;
+            color: white;
+        }
+        #stopBtn:hover, .stop-btn:hover {
+            background-color: #c0392b;
+        }
+        .process-list {
+            text-align: left;
+            background-color: #ecf0f1;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 2rem;
+        }
+        .process-list h2 {
+            margin-top: 0;
+            color: #34495e;
+        }
+        .process-item {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background-color: #fff;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .process-name {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .process-status {
+            padding: 0.3rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 0.5rem;
+        }
+        .status-running {
+            background-color: #2ecc71;
+            color: white;
+        }
+        .status-stopped {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .process-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .process-controls button {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+            text-transform: none;
+        }
+        .version-info {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #34495e;
+        }
+        .update-available {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .loader {
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid #3498db;
+        border-radius: 50%;
+        width: 16px;
+        height: 16px;
+        animation: spin 1s linear infinite;
+        display: inline-block;
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .update-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .update-btn .loader {
+        display: none;
+    }
+
+    .update-btn.loading .loader {
+        display: inline-block;
+    }
+
+    .update-btn.loading .button-text {
+        display: none;
+    }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SasthoTech Hospital Management System</h1>
+        <p class="subtitle">Monitor and control your hospital system servers</p>
+        <div class="button-container">
+            <button id="updateAllBtn">Update All</button>
+            <button id="restartAllBtn">Restart All</button>
+            <button id="stopAllBtn">Stop All</button>
+        </div>
+        <div class="process-list">
+            <h2>Running Processes</h2>
+            <div id="processList"></div>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        const {  api } = require('./api');
+        const axios = require('axios');
+    async function updateProcessList(processes) {
+        const processListElement = document.getElementById('processList');
+        processListElement.innerHTML = '';
+
+        for (const process of processes) {
+            const processItem = document.createElement('div');
+            processItem.className = 'process-item';
+            processItem.innerHTML = `
+                <div>
+                    <span class="process-name">${process.name}</span>
+                    <span class="process-status status-${process.status.toLowerCase()}" id="${process.id}-status">${process.status}</span>
+                    <div class="version-info">
+                        Current Version: <span id="${process.id}-version">Loading...</span>
+                        <span id="${process.id}-update-available" class="update-available" style="display: none;"></span>
+                    </div>
+                </div>
+                <div class="process-controls">
+                    <button class="start-btn" onclick="startServer('${process.id}')">Start</button>
+                    <button class="stop-btn" onclick="stopServer('${process.id}')">Stop</button>
+                    <button class="update-btn" id="${process.id}-update-btn" onclick="handleUpdateButtonClick('${process.id}')">Check Update</button>
+                </div>
+            `;
+            processListElement.appendChild(processItem);
+            await checkVersionAndUpdate(process.id);
+        }
+    }
+
+    async function checkVersionAndUpdate(id) {
+        try {
+           
+            const loginData = await getLoginData();
+
+            console.log(loginData,'login Data')
+            console.log(`Fetching current version and checking for updates for ${id}`);
+            const versionResponse = await api.get(`http://localhost:5001/api/v1/update/get-version/${id}`);
+            const currentVersion = versionResponse.data.version;
+            document.getElementById(`${id}-version`).textContent = currentVersion;
+
+            const updateResponse = await api.get(`http://localhost:5001/api/v1/update/check-update/${id}/${currentVersion}`);
+            const updateData = updateResponse.data;
+
+            const updateAvailableElement = document.getElementById(`${id}-update-available`);
+            const updateButton = document.getElementById(`${id}-update-btn`);
+            
+            if (updateData?.hasUpdate) {
+                updateAvailableElement.textContent = `Update available: ${updateData.latestVersion}`;
+                updateAvailableElement.style.display = 'block';
+                updateButton.innerHTML = '<span class="loader"></span><span class="button-text">Download Update</span>';
+                updateButton.onclick = () => downloadUpdate(id, currentVersion);
+            } else {
+                updateAvailableElement.style.display = 'none';
+                updateButton.innerHTML = '<span class="button-text">Check Update</span>';
+                updateButton.onclick = () => checkVersionAndUpdate(id);
+            }
+        } catch (error) {
+            console.error(`Error fetching version or checking for updates for ${id}:`, error);
+            document.getElementById(`${id}-version`).textContent = 'Error';
+            document.getElementById(`${id}-update-available`).style.display = 'none';
+            document.getElementById(`${id}-update-btn`).innerHTML = '<span class="button-text">Check Update</span>';
+        }
+    }
+
+    async function downloadUpdate(id, currentVersion) {
+        try {
+            console.log('Downloading update');
+            const updateButton = document.getElementById(`${id}-update-btn`);
+            updateButton.classList.add('loading');
+
+            const response = await api.get(`http://localhost:5001/api/v1/update/check-update/${id}/${currentVersion}`);
+            const data = response.data;
+
+            if (data?.hasUpdate) {
+                const updateUrl = data?.downloadUrl;
+                console.log(updateUrl, 'updateUrl');
+                ipcRenderer.send('download-update', {serverName: id, updateUrl});
+            } else {
+                console.log('No update available');
+                updateButton.classList.remove('loading');
+            }
+        } catch (error) {
+            console.error(`Error downloading update for ${id}:`, error);
+            alert(`Error downloading update for ${id}`);
+            const updateButton = document.getElementById(`${id}-update-btn`);
+            updateButton.classList.remove('loading');
+        }
+    }
+
+    function handleUpdateButtonClick(id) {
+        const updateButton = document.getElementById(`${id}-update-btn`);
+        if (updateButton.textContent.includes('Download Update')) {
+            const currentVersion = document.getElementById(`${id}-version`).textContent;
+            downloadUpdate(id, currentVersion);
+        } else {
+            checkVersionAndUpdate(id);
+        }
+    }
+    async function getLoginData() {
+  return await ipcRenderer.invoke('get-login-data');
+}
+ async function  updateVersion(service,version){
+    try{
+        const loginData = await getLoginData();
+        console.log(loginData,'login Data')
+        if(loginData){
+
+            const response = await await axios.patch(`http://localhost:5001/api/v1/update/update-version/${service}?diagnosticId=${loginData.diagnosticId}`, {
+          version
+        });
+        console.log(response.data)
+        }
+
+    }catch(error){
+        console.error(error)
+    }
+ }
+    ipcRenderer.on('update-downloaded', async(event, { serverName, extractPath }) => {
+        console.log(`Update downloaded and extracted for ${serverName} at ${extractPath}`);
+        const updateButton = document.getElementById(`${serverName}-update-btn`);
+        const updateAvailableElement = document.getElementById(`${serverName}-update-available`);
+        await updateVersion(serverName,updateAvailableElement.textContent.split(": ")[1])
+        await checkVersionAndUpdate(serverName);
+        updateButton.classList.remove('loading');
+        updateButton.innerHTML = '<span class="button-text">Check Update</span>';
+        updateButton.onclick = () => checkVersionAndUpdate(serverName);
+        alert(`Update completed for ${serverName}`);
+    });
+
+    ipcRenderer.on('update-download-failed', (event, { serverName, error }) => {
+        console.error(`Update download failed for ${serverName}: ${error}`);
+        const updateButton = document.getElementById(`${serverName}-update-btn`);
+        updateButton.classList.remove('loading');
+        updateButton.innerHTML = '<span class="button-text">Check Update</span>';
+        updateButton.onclick = () => checkVersionAndUpdate(serverName);
+        alert(`Update failed for ${serverName}: ${error}`);
+    });
+
+        function startServer(id) {
+            ipcRenderer.send('start-server', id);
+        }
+
+        function stopServer(id) {
+            ipcRenderer.send('stop-server', id);
+        }
+
+        document.getElementById('updateAllBtn').addEventListener('click', () => {
+            ipcRenderer.send('update-all-servers');
+        });
+
+        document.getElementById('restartAllBtn').addEventListener('click', () => {
+            ipcRenderer.send('start-all-server');
+        });
+        async function login(email, password) {
+     try {
+    const result = await window.ipcRenderer.invoke('login', { email, password });
+    if (result.success) {
+      console.log('Login successful:', result.data);
+      // Update UI or perform actions after successful login
+    } else {
+      console.error('Login failed:', result.error);
+      // Handle login failure (show error message, etc.)
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    // Handle any unexpected errors
+  }
+}
+        document.getElementById('stopAllBtn').addEventListener('click', () => {
+            ipcRenderer.send('stop-all-servers');
+        });
+
+        ipcRenderer.on('update-status', (event, status) => {
+            alert(`Update status: ${status}`);
+        });
+
+        ipcRenderer.on('restart-status', (event, status) => {
+            alert(`Restart status: ${status}`);
+        });
+
+        ipcRenderer.on('process-status', (event, { id, status }) => {
+            const statusElement = document.getElementById(`${id}-status`);
+            if (statusElement) {
+                statusElement.textContent = status;
+                statusElement.className = `process-status status-${status.toLowerCase()}`;
+            }
+        });
+
+        // Initial process list update
+        const initialProcesses = [
+            { id: 'synchronizer', name: 'Synchronizer Server', status: 'Stopped' },
+            { id: 'backend', name: 'Backend Server', status: 'Stopped' },
+            { id: 'frontend', name: 'Next Js Frontend', status: 'Stopped' },
+        ];
+        updateProcessList(initialProcesses);
+
+        // Request initial server status
+        ipcRenderer.send('get-server-status');
+    </script>
+</body>
+</html>
