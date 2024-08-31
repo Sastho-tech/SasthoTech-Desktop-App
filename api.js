@@ -1,10 +1,10 @@
 const axios = require('axios');
 const { ipcRenderer } = require('electron');
 const { readSync } = require('original-fs');
-
+require('dotenv').config();
 async function login(email, password) {
   try {
-    const response = await axios.post('http://localhost:5001/api/v1/auth/login', {
+    const response = await axios.post(`${process.env.SERVER_URL}/auth/login`, {
       email,
       password
     });

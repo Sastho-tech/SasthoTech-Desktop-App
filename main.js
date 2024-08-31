@@ -8,6 +8,7 @@ const { promisify } = require('util');
 const { login, api } = require('./api');
 const AdmZip = require('adm-zip');
 const util = require('util');
+// const open = require('open');/
 
 const execPromise = util.promisify(exec);
 require('dotenv').config();
@@ -17,21 +18,25 @@ const streamPipeline = promisify(pipeline);
 let mainWindow;
 let servers = {};
 let loginData = null;
+let chromeProcess = null;
 const processes = [
   {
     name: 'synchronizer',
     scriptPath: path.join('C:', 'SasthoTech', 'Synchronizer', 'bundle.js'),
     workingDir: 'C:\\SasthoTech\\Synchronizer',
+    setupPath: 'C:\\SasthoTech\\Synchronizer\\setup.bat',
   },
   {
     name: 'backend',
     scriptPath: path.join('C:', 'SasthoTech', 'Backend', 'sasthotech-hospital-backend-v1.cjs'),
     workingDir: 'C:\\SasthoTech\\Backend',
+    setupPath: 'C:\\SasthoTech\\Backend\\setup.bat',
   },
   {
    name: 'frontend',
    scriptPath: path.join('C:', 'SasthoTech', 'Frontend', 'server.js'),
-   workingDir: 'C:\\SasthoTech\\Frontend'
+   workingDir: 'C:\\SasthoTech\\Frontend',
+   setupPath: 'C:\\SasthoTech\\Frontend\\setup.bat',
   }
 ];
 
@@ -44,13 +49,60 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
-    }
+    },
+    icon: path.join(__dirname, 'icon.ico'), // Use .ico for Windows
   });
 
   mainWindow.loadFile('index.html');
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
+}
+function createSetupWindow() {
+  setupWindow = new BrowserWindow({
+    width: 600,
+    height: 400,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  setupWindow.loadFile('setup.html');
+}
+
+async function runSetup() {
+  setupWindow.webContents.send('create-progress-items', processes.map(p => ({ id: p.id, name: p.name })));
+
+  for (const process of processes) {
+    try {
+      setupWindow.webContents.send('update-progress', {
+        id: process.id,
+        progress: 0,
+        status: 'Starting setup...'
+      });
+
+      const { stdout, stderr } = await execPromise(process.setupPath, { cwd: process.workingDir });
+      
+      console.log(`${process.name} setup stdout:`, stdout);
+      if (stderr) console.error(`${process.name} setup stderr:`, stderr);
+
+      setupWindow.webContents.send('update-progress', {
+        id: process.id,
+        progress: 100,
+        status: 'Setup complete'
+      });
+    } catch (error) {
+      console.error(`Error during ${process.name} setup:`, error);
+      setupWindow.webContents.send('update-progress', {
+        id: process.id,
+        progress: 100,
+        status: 'Setup failed'
+      });
+    }
+  }
+
+  setupWindow.webContents.send('setup-complete');
 }
 ipcMain.handle('login', async (event, { email, password }) => {
   try {
@@ -74,6 +126,7 @@ function startServer(name, scriptPath, workingDir) {
 
     server.stdout.on('data', (data) => {
       console.log(`${name} stdout: ${data}`);
+      mainWindow.webContents.send('process-status', { id: name, status: 'Running' });
     });
 
     server.stderr.on('data', (data) => {
@@ -111,22 +164,21 @@ function stopAllServers() {
   });
 }
 function startAllServers(){
-  startServer(
-    'synchronizer',
-    path.join('C:', 'SasthoTech', 'Synchronizer', 'bundle.js'),
-    'C:\\SasthoTech\\Synchronizer'
-  );
 
-  startServer(
-    'backend',
-    path.join('C:', 'SasthoTech', 'Backend', 'sasthotech-hospital-backend-v1.cjs'),
-    'C:\\SasthoTech\\Backend'
-  );
+  processes.forEach((process)=>{
+    startServer(
+      process.name,
+      process.scriptPath,
+      process.workingDir
+    );
+
+  })
+
 }
 async function getCurrentVersion(serverName) {
   try {
     const response = await api.get(`${API_BASE_URL}/api/v1/update/get-version/${serverName}`);
-    console.log(response,serverName,'this')
+    console.log(response,serverName,'this') 
     return response.data.version;
   } catch (error) {
     console.error(`Error getting current version for ${serverName}:`, error);
@@ -380,4 +432,34 @@ ipcMain.handle('get-login-data', (event) => {
 ipcMain.handle('get-token', async () => {
   const cookies = await session.defaultSession.cookies.get({ name: 'token' });
   return cookies.length > 0 ? cookies[0].value : null;
+});
+ipcMain.on('launch-chrome', async () => {
+  if (!chromeProcess) {
+    const url = 'http://localhost:3000'; // Your frontend URL
+    //  Alternate method using child_process (platform-specific)
+    let command;
+    if (process.platform === 'win32') {
+      command = `start chrome ${url}`;
+    } else if (process.platform === 'darwin') {
+      command = `open -a "Google Chrome" ${url}`;
+    } else {
+      command = `google-chrome ${url}`;
+    }
+  
+    exec(command, (error) => {
+      if (error) {
+        console.error(`Failed to open Chrome: ${error}`);
+      }
+    });}
+});
+
+ipcMain.on('check-chrome-status', (event) => {
+  event.reply('chrome-status', chromeProcess !== null);
+});
+ipcMain.on('open-setup-window', () => {
+  createSetupWindow();
+});
+
+ipcMain.on('start-setup', () => {
+  runSetup();
 });
