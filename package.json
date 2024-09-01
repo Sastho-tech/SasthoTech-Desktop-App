@@ -1,6 +1,6 @@
 {
   "name": "electron-multi-server-app",
-  "version": "1.0.3",
+  "version": "1.0.1",
   "description": "Electron app running three Node.js servers",
   "main": "main.js",
   "scripts": {
