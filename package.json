@@ -1,29 +1,42 @@
 {
   "name": "electron-multi-server-app",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Electron app running three Node.js servers",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder",
+    "build": "electron-builder build --win --publish never",
+    "deploy": "electron-builder build --win --publish always",
     "build:css": "tailwindcss -i ./styles.css -o ./output.css --watch",
-    "dev": "concurrently \"npm run build:css\" \"electron .\""
+    "dev": "concurrently \"npm run build:css\" \"electron .\"",
+    "build:msi": "electron-builder --win msi"
   },
   "build": {
     "appId": "com.sasthotech.hms",
     "productName": "Sasthotech Server Manager",
-    "publish": [{
-    "provider": "generic",
-    "url": "https://your-update-server.com/updates"
-  }],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Sastho-tech",
+        "repo": "SasthoTech-Desktop-App"
+      }
+    ],
     "win": {
-      "icon": "icon.ico"
+      "icon": "icon.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   },
   "dependencies": {
     "adm-zip": "^0.5.15",
     "axios": "^1.7.5",
     "dotenv": "^16.4.5",
+    "electron-log": "^5.1.7",
     "electron-updater": "^6.2.1",
     "express": "^4.17.1",
     "fs-extra": "^11.2.0",

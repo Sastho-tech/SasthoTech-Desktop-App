@@ -41,6 +41,7 @@
         justify-content: center;
         gap: 1rem;
         margin-bottom: 2rem;
+        margin-top: 30px;
         flex-wrap: wrap;
       }
       button {
@@ -103,6 +104,7 @@
         border-radius: 6px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         display: flex;
+        flex-wrap: wrap;
         justify-content: space-between;
         align-items: center;
       }
@@ -127,6 +129,7 @@
       }
       .process-controls {
         display: flex;
+        flex-wrap: wrap;
         gap: 0.5rem;
       }
       .process-controls button {
@@ -279,30 +282,24 @@
   </head>
   <body>
     <div class="container">
-      <h1>SasthoTech Hospital Management System</h1>
+      <h1>SasthoTech Hospital Management System v1.0.1</h1>
       <p class="subtitle">Monitor and control your hospital system servers</p>
-      <div id="updateStatus">Checking for updates...</div>
-      <button id="checkUpdateBtn" onclick="appCheckForUpdates()">
-        Check for Updates
-      </button>
-      <button
-        id="downloadBtn"
-        style="display: none"
-        onclick="appDownloadUpdate()"
-      >
+      <!-- Add these elements for update status and controls -->
+      <div id="update-status">Checking for updates...</div>
+      <div id="download-progress" style="display: none">
+        <div id="progress-bar"></div>
+      </div>
+      <button id="check-for-updates-btn">Check for Updates</button>
+      <button id="download-update-btn" style="display: none">
         Download Update
       </button>
-      <button
-        id="installBtn"
-        style="display: none"
-        onclick="appInstallUpdate()"
-      >
-        Install Update
+      <button id="restart-app-btn" style="display: none">
+        Restart and Install
       </button>
       <div class="button-container">
-        <button id="updateAllBtn">Update All</button>
-        <button id="restartAllBtn">Restart All</button>
-        <button id="stopAllBtn">Stop All</button>
+        <!-- <button id="updateAllBtn">Update All</button> -->
+        <button id="restartAllBtn" class="start-btn">Restart All</button>
+        <button id="stopAllBtn" class="stop-btn">Stop All</button>
         <button id="setupBtn" class="setup-btn">Run Setup</button>
       </div>
       <div class="chrome-launch-container">
@@ -562,9 +559,9 @@
         ipcRenderer.send("stop-server", id);
       }
 
-      document.getElementById("updateAllBtn").addEventListener("click", () => {
-        ipcRenderer.send("update-all-servers");
-      });
+      // document.getElementById("updateAllBtn").addEventListener("click", () => {
+      //   ipcRenderer.send("update-all-servers");
+      // });
 
       document.getElementById("restartAllBtn").addEventListener("click", () => {
         ipcRenderer.send("start-all-server");
@@ -649,52 +646,47 @@
       function installUpdate() {
         ipcRenderer.send("quit-and-install");
       }
-      let updateInfo = null;
-
-      function appCheckForUpdates() {
-        document.getElementById("updateStatus").innerText =
-          "Checking for updates...";
-        ipcRenderer.send("check-for-updates");
-      }
-
-      function appDownloadUpdate() {
-        document.getElementById("updateStatus").innerText =
-          "Downloading update...";
-        ipcRenderer.send("download-update", updateInfo);
-      }
-
-      function appInstallUpdate() {
-        document.getElementById("updateStatus").innerText =
-          "Installing update...";
-        ipcRenderer.send("quit-and-install");
-      }
-
-      ipcRenderer.on("app-update-available", (event, info) => {
-        updateInfo = info;
-        document.getElementById(
-          "updateStatus"
-        ).innerText = `Update available: ${info.latestVersion}`;
-        document.getElementById("downloadBtn").style.display = "inline";
+      // Add these event listeners for auto-update
+      ipcRenderer.on("app-update-status", (event, text) => {
+        document.getElementById("update-status").innerText = text;
       });
 
-      ipcRenderer.on("app-update-not-available", () => {
-        document.getElementById("updateStatus").innerText =
-          "No updates available.";
+      ipcRenderer.on("app-update-available", () => {
+        document.getElementById("download-update-btn").style.display =
+          "inline-block";
+      });
+
+      ipcRenderer.on("app-download-progress", (event, percent) => {
+        document.getElementById("download-progress").style.display = "block";
+        document.getElementById("progress-bar").style.width = percent + "%";
       });
 
       ipcRenderer.on("app-update-downloaded", () => {
-        document.getElementById("updateStatus").innerText =
-          "Update downloaded. Ready to install.";
-        document.getElementById("downloadBtn").style.display = "none";
-        document.getElementById("installBtn").style.display = "inline";
+        document.getElementById("restart-app-btn").style.display =
+          "inline-block";
       });
 
-      ipcRenderer.on("app-update-error", (event, message) => {
-        document.getElementById("updateStatus").innerText = `Error: ${message}`;
-      });
+      document
+        .getElementById("check-for-updates-btn")
+        .addEventListener("click", () => {
+          ipcRenderer.send("check-for-app-updates");
+        });
+
+      document
+        .getElementById("download-update-btn")
+        .addEventListener("click", () => {
+          ipcRenderer.send("download-app-update");
+        });
+
+      document
+        .getElementById("restart-app-btn")
+        .addEventListener("click", () => {
+          ipcRenderer.send("app-quit-and-install");
+        });
 
       // Check for updates when the app starts
       checkForUpdates();
+
       // Request initial server status
       ipcRenderer.send("get-server-status");
     </script>

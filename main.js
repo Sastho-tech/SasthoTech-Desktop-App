@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain,session } = require('electron');
 const path = require('path');
-const { fork,exec,spawn } = require('child_process');
+const { fork,exec,spawn, execFile } = require('child_process');
 const axios = require('axios');
 const fs = require('fs-extra');
 const { pipeline } = require('stream');
@@ -8,6 +8,7 @@ const { promisify } = require('util');
 const { login, api } = require('./api');
 const AdmZip = require('adm-zip');
 const util = require('util');
+const log = require('electron-log');
 const { autoUpdater } = require("electron-updater");
 // const open = require('open');/
 
@@ -58,6 +59,7 @@ function createWindow() {
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
+  initAutoUpdater();
 }
 function createSetupWindow() {
   setupWindow = new BrowserWindow({
@@ -344,6 +346,7 @@ app.whenReady().then(async() => {
     path.join('C:', 'SasthoTech', 'Frontend', 'server.js'),
     'C:\\SasthoTech\\Frontend'
   );
+  autoUpdater.checkForUpdatesAndNotify();
  
 });
 
@@ -512,56 +515,54 @@ ipcMain.on('open-setup-window', () => {
 ipcMain.on('start-setup', () => {
   runSetup();
 });
-async function checkForUpdates() {
-  try {
-    const response = await axios.get(`http://your-api-url/check-update/electron/${app.getVersion()}`);
-    const updateInfo = response.data;
+function initAutoUpdater() {
+  autoUpdater.logger = log;
+  autoUpdater.logger.transports.file.level = 'info';
+  log.info('App starting...');
 
-    if (updateInfo.hasUpdate) {
-      mainWindow.webContents.send('app-update-available', updateInfo);
-    } else {
-      mainWindow.webContents.send('app-update-not-available');
-    }
-  } catch (error) {
-    log.error('Error checking for updates:', error);
-    mainWindow.webContents.send('app-update-error', error.message);
-  }
+  autoUpdater.on('checking-for-update', () => {
+    log.info('Checking for update...');
+    mainWindow.webContents.send('update-status', 'Checking for update...');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    log.info('Update available.', info);
+    mainWindow.webContents.send('update-status', 'Update available');
+    mainWindow.webContents.send('update-available', info);
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    log.info('Update not available.', info);
+    mainWindow.webContents.send('app-update-status', 'Update not available');
+  });
+
+  autoUpdater.on('error', (err) => {
+    log.error('Error in auto-updater. ', err);
+    mainWindow.webContents.send('app-update-status', 'Update error');
+  });
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    let log_message = `Download speed: ${progressObj.bytesPerSecond}`;
+    log_message = `${log_message} - Downloaded ${progressObj.percent}%`;
+    log_message = `${log_message} (${progressObj.transferred}/${progressObj.total})`;
+    log.info(log_message);
+    mainWindow.webContents.send('app-download-progress', progressObj.percent);
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    log.info('Update downloaded', info);
+    mainWindow.webContents.send('app-update-status', 'Update downloaded');
+  });
 }
-
-ipcMain.on('download-update', async (event, updateInfo) => {
-  try {
-    const savePath = path.join(app.getPath('temp'), 'electron-update.exe');
-    const writer = fs.createWriteStream(savePath);
-
-    const response = await axios({
-      url: updateInfo.downloadUrl,
-      method: 'GET',
-      responseType: 'stream'
-    });
-
-    response.data.pipe(writer);
-
-    writer.on('finish', () => {
-      mainWindow.webContents.send('app-update-downloaded');
-    });
-
-    writer.on('error', (err) => {
-      log.error('Error downloading update:', err);
-      mainWindow.webContents.send('app-update-error', 'Failed to download update');
-    });
-  } catch (error) {
-    log.error('Error initiating update download:', error);
-    mainWindow.webContents.send('app-update-error', 'Failed to initiate update download');
-  }
+// Add these IPC handlers
+ipcMain.on('check-for-app-updates', () => {
+  autoUpdater.checkForUpdatesAndNotify();
 });
 
-ipcMain.on('quit-and-install', () => {
-  const updateExePath = path.join(app.getPath('temp'), 'electron-update.exe');
-  execFile(updateExePath, (err) => {
-    if (err) {
-      log.error('Failed to execute update:', err);
-      mainWindow.webContents.send('app-update-error', 'Failed to execute update');
-    }
-    app.quit();
-  });
+ipcMain.on('download-app-update', () => {
+  autoUpdater.downloadUpdate();
+});
+
+ipcMain.on('app-quit-and-install', () => {
+  autoUpdater.quitAndInstall();
 });
