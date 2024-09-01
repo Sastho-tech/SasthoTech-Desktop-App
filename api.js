@@ -4,7 +4,7 @@ const { readSync } = require('original-fs');
 require('dotenv').config();
 async function login(email, password) {
   try {
-    const response = await axios.post(`${process.env.SERVER_URL}/auth/login`, {
+    const response = await axios.post(`${process.env.MAIN_SERVER_URL}/auth/login`, {
       email,
       password
     });

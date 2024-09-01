@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain,session } = require('electron');
 const path = require('path');
-const { fork,exec } = require('child_process');
+const { fork,exec,spawn } = require('child_process');
 const axios = require('axios');
 const fs = require('fs-extra');
 const { pipeline } = require('stream');
@@ -8,6 +8,7 @@ const { promisify } = require('util');
 const { login, api } = require('./api');
 const AdmZip = require('adm-zip');
 const util = require('util');
+const { autoUpdater } = require("electron-updater");
 // const open = require('open');/
 
 const execPromise = util.promisify(exec);
@@ -71,33 +72,80 @@ function createSetupWindow() {
   setupWindow.loadFile('setup.html');
 }
 
-async function runSetup() {
-  setupWindow.webContents.send('create-progress-items', processes.map(p => ({ id: p.id, name: p.name })));
+async function runSetup(processToRun = null) {
+  const processesToSetup = processToRun ? [processToRun] : processes;
+  setupWindow.webContents.send('create-progress-items', processes.map(p => ({ id: p.name, name: p.name })));
 
-  for (const process of processes) {
+  for (const process of processesToSetup) {
     try {
       setupWindow.webContents.send('update-progress', {
-        id: process.id,
+        id: process.name,
         progress: 0,
-        status: 'Starting setup...'
+        status: 'Initializing setup...'
       });
 
-      const { stdout, stderr } = await execPromise(process.setupPath, { cwd: process.workingDir });
-      
-      console.log(`${process.name} setup stdout:`, stdout);
-      if (stderr) console.error(`${process.name} setup stderr:`, stderr);
+      await new Promise((resolve, reject) => {
+        const setupProcess = spawn(process.setupPath, [], { 
+          cwd: process.workingDir,
+          shell: true
+        });
 
-      setupWindow.webContents.send('update-progress', {
-        id: process.id,
-        progress: 100,
-        status: 'Setup complete'
+        let output = '';
+        let currentProgress = 0;
+
+        setupProcess.stdout.on('data', (data) => {
+          output += data.toString();
+          console.log(`${process.name} setup stdout:`, data.toString());
+          
+          // Simulate progress based on output
+          currentProgress += 10;
+          if (currentProgress > 90) currentProgress = 90;
+
+          // Update progress and status based on output
+          let status = 'Running setup...';
+          if (output.includes('npm install')) status = 'Installing dependencies...';
+          if (output.includes('npm run generate')) status = 'Generating files...';
+
+          setupWindow.webContents.send('update-progress', {
+            id: process.name,
+            progress: currentProgress,
+            status: status
+          });
+        });
+
+        setupProcess.stderr.on('data', (data) => {
+          console.error(`${process.name} setup stderr:`, data.toString());
+          setupWindow.webContents.send('update-progress', {
+            id: process.name,
+            progress: currentProgress,
+            status: 'Warning: ' + data.toString().trim()
+          });
+        });
+
+        setupProcess.on('close', (code) => {
+          if (code === 0) {
+            setupWindow.webContents.send('update-progress', {
+              id: process.name,
+              progress: 100,
+              status: 'Setup complete'
+            });
+            resolve();
+          } else {
+            reject(new Error(`${process.name} setup exited with code ${code}`));
+          }
+        });
       });
+
     } catch (error) {
       console.error(`Error during ${process.name} setup:`, error);
       setupWindow.webContents.send('update-progress', {
-        id: process.id,
+        id: process.name,
         progress: 100,
-        status: 'Setup failed'
+        status: 'Setup failed: ' + error.message
+      });
+      setupWindow.webContents.send('setup-error', {
+        id: process.name,
+        error: error.message
       });
     }
   }
@@ -120,7 +168,7 @@ function startServer(name, scriptPath, workingDir) {
 
     const server = fork(scriptPath, [], {
       cwd: workingDir,
-      env: { ...process.env },
+      // env: { ...process.env },
       stdio: 'pipe'
     });
 
@@ -296,6 +344,7 @@ app.whenReady().then(async() => {
     path.join('C:', 'SasthoTech', 'Frontend', 'server.js'),
     'C:\\SasthoTech\\Frontend'
   );
+ 
 });
 
 app.on('window-all-closed', () => {
@@ -462,4 +511,57 @@ ipcMain.on('open-setup-window', () => {
 
 ipcMain.on('start-setup', () => {
   runSetup();
+});
+async function checkForUpdates() {
+  try {
+    const response = await axios.get(`http://your-api-url/check-update/electron/${app.getVersion()}`);
+    const updateInfo = response.data;
+
+    if (updateInfo.hasUpdate) {
+      mainWindow.webContents.send('app-update-available', updateInfo);
+    } else {
+      mainWindow.webContents.send('app-update-not-available');
+    }
+  } catch (error) {
+    log.error('Error checking for updates:', error);
+    mainWindow.webContents.send('app-update-error', error.message);
+  }
+}
+
+ipcMain.on('download-update', async (event, updateInfo) => {
+  try {
+    const savePath = path.join(app.getPath('temp'), 'electron-update.exe');
+    const writer = fs.createWriteStream(savePath);
+
+    const response = await axios({
+      url: updateInfo.downloadUrl,
+      method: 'GET',
+      responseType: 'stream'
+    });
+
+    response.data.pipe(writer);
+
+    writer.on('finish', () => {
+      mainWindow.webContents.send('app-update-downloaded');
+    });
+
+    writer.on('error', (err) => {
+      log.error('Error downloading update:', err);
+      mainWindow.webContents.send('app-update-error', 'Failed to download update');
+    });
+  } catch (error) {
+    log.error('Error initiating update download:', error);
+    mainWindow.webContents.send('app-update-error', 'Failed to initiate update download');
+  }
+});
+
+ipcMain.on('quit-and-install', () => {
+  const updateExePath = path.join(app.getPath('temp'), 'electron-update.exe');
+  execFile(updateExePath, (err) => {
+    if (err) {
+      log.error('Failed to execute update:', err);
+      mainWindow.webContents.send('app-update-error', 'Failed to execute update');
+    }
+    app.quit();
+  });
 });
