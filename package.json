@@ -11,6 +11,10 @@
     "dev": "concurrently \"npm run build:css\" \"electron .\"",
     "build:msi": "electron-builder --win msi"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sastho-tech/SasthoTech-Desktop-App.git"
+  },
   "build": {
     "appId": "com.sasthotech.hms",
     "productName": "Sasthotech Server Manager",
@@ -18,7 +22,9 @@
       {
         "provider": "github",
         "owner": "Sastho-tech",
-        "repo": "SasthoTech-Desktop-App"
+        "repo": "SasthoTech-Desktop-App",
+        "private": true,
+        "token": "${env.GH_TOKEN}"
       }
     ],
     "win": {
@@ -37,7 +43,6 @@
     "axios": "^1.7.5",
     "dotenv": "^16.4.5",
     "electron-log": "^5.1.7",
-    "electron-updater": "^6.2.1",
     "express": "^4.17.1",
     "fs-extra": "^11.2.0",
     "open": "^10.1.0"
@@ -47,6 +52,7 @@
     "concurrently": "^8.2.2",
     "electron": "^32.0.1",
     "electron-builder": "^24.13.3",
+    "electron-updater": "^6.2.1",
     "postcss": "^8.4.41",
     "tailwindcss": "^3.4.10"
   }

@@ -10,8 +10,19 @@ const AdmZip = require('adm-zip');
 const util = require('util');
 const log = require('electron-log');
 const { autoUpdater } = require("electron-updater");
+const isDev = process.env.NODE_ENV === 'development';
 // const open = require('open');/
+// Configure logging
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = 'debug'; // Set to 'debug' for more detailed logs
 
+// Configure the updater
+autoUpdater.setFeedURL({
+  provider: 'github',
+  owner: 'Sastho-tech',
+  repo: 'SasthoTech-Desktop-App',
+  private: true, // Set to false if it's a public repository
+});
 const execPromise = util.promisify(exec);
 require('dotenv').config();
 
@@ -43,7 +54,12 @@ const processes = [
 ];
 
 const API_BASE_URL = 'http://localhost:5001';
-
+if (process.env.NODE_ENV === 'development') {
+  const updateConfigPath = path.join(__dirname, 'dev-app-update.yml');
+  log.info('Running in dev mode, using update config:', updateConfigPath);
+  autoUpdater.updateConfigPath = updateConfigPath;
+  autoUpdater.forceDevUpdateConfig=true
+}
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -346,7 +362,11 @@ app.whenReady().then(async() => {
     path.join('C:', 'SasthoTech', 'Frontend', 'server.js'),
     'C:\\SasthoTech\\Frontend'
   );
-  autoUpdater.checkForUpdatesAndNotify();
+  if (!isDev) {
+    autoUpdater.checkForUpdatesAndNotify();
+  } else {
+    log.info('Skipping auto update check in development mode');
+  }
  
 });
 
@@ -535,9 +555,20 @@ function initAutoUpdater() {
     log.info('Update not available.', info);
     mainWindow.webContents.send('app-update-status', 'Update not available');
   });
+  autoUpdater.logger = log;
+  autoUpdater.logger.transports.file.level = 'debug'; // Set to debug for more information
+  log.info('App starting...', { version: app.getVersion() });
+  log.info('Auto-updater config:', autoUpdater.getFeedURL());
 
   autoUpdater.on('error', (err) => {
-    log.error('Error in auto-updater. ', err);
+    log.error('Error in auto-updater. ');
+    // log.error('Auto Updater error:', error);
+  // if (err.stack) {
+  //   log.error('Stack:', err.stack);
+  // }
+  // if (err.cause) {
+  //   log.error('Cause:', err.cause);
+  // }
     mainWindow.webContents.send('app-update-status', 'Update error');
   });
 
@@ -556,6 +587,9 @@ function initAutoUpdater() {
 }
 // Add these IPC handlers
 ipcMain.on('check-for-app-updates', () => {
+  if (isDev) {
+    log.info('Manually checking for updates in dev mode');
+  }
   autoUpdater.checkForUpdatesAndNotify();
 });
 
