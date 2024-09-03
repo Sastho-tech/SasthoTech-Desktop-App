@@ -23,8 +23,7 @@
         "provider": "github",
         "owner": "Sastho-tech",
         "repo": "SasthoTech-Desktop-App",
-        "private": true,
-      
+        "private": true
       }
     ],
     "win": {
