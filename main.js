@@ -15,15 +15,11 @@ const isDev = process.env.NODE_ENV === 'development';
 // Configure logging
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = 'debug'; // Set to 'debug' for more detailed logs
-
-// Configure the updater
 autoUpdater.setFeedURL({
   provider: 'github',
   owner: 'Sastho-tech',
-  repo: 'SasthoTech-Desktop-App',
-  // private: true, // Set to false if it's a public repository
-  // token:process.env.GH_TOKEN
-});
+  repo: 'SasthoTech-Desktop-App'
+})
 const execPromise = util.promisify(exec);
 require('dotenv').config();
 
