@@ -1,6 +1,6 @@
 {
   "name": "electron-multi-server-app",
-  "version": "1.0.2",
+  "version": "1.0.1",
   "description": "Electron app running three Node.js servers",
   "main": "main.js",
   "scripts": {
@@ -10,6 +10,10 @@
     "build:css": "tailwindcss -i ./styles.css -o ./output.css --watch",
     "dev": "concurrently \"npm run build:css\" \"electron .\"",
     "build:msi": "electron-builder --win msi"
+  },
+  "author": {
+    "name": "Shihab Sarar Islam Rafid",
+    "email": "shihabsararrafid@gmail.com"
   },
   "repository": {
     "type": "git",
@@ -22,8 +26,7 @@
       {
         "provider": "github",
         "owner": "Sastho-tech",
-        "repo": "SasthoTech-Desktop-App",
-        "private": true
+        "repo": "SasthoTech-Desktop-App"
       }
     ],
     "win": {
@@ -50,7 +53,7 @@
     "autoprefixer": "^10.4.20",
     "concurrently": "^8.2.2",
     "electron": "^32.0.1",
-    "electron-builder": "^24.13.3",
+    "electron-builder": "^25.0.5",
     "electron-updater": "^6.2.1",
     "postcss": "^8.4.41",
     "tailwindcss": "^3.4.10"

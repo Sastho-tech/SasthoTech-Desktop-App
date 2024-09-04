@@ -21,7 +21,8 @@ autoUpdater.setFeedURL({
   provider: 'github',
   owner: 'Sastho-tech',
   repo: 'SasthoTech-Desktop-App',
-  private: true, // Set to false if it's a public repository
+  // private: true, // Set to false if it's a public repository
+  // token:process.env.GH_TOKEN
 });
 const execPromise = util.promisify(exec);
 require('dotenv').config();
